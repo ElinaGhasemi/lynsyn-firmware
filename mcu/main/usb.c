@@ -292,9 +292,21 @@ static void setBreakpoint(struct BreakpointRequestPacket *bpReq) {
   }
 }
 
+double harvestingCurrent;
+extern void Intermittent_init(void);
+extern double primaryEnergy, resumeEnergy, backupThreshold, offThreshold, CapacityEnergy;
+static void updateSolarCurrent(struct HarvestingCurrentPacket *updateSolarCurrentReq) {
+  harvestingCurrent = (double)updateSolarCurrentReq->HarvestingCurrent /1000000000 ;
+  primaryEnergy = (double)updateSolarCurrentReq->primaryEnergy /1000000 ;
+  resumeEnergy = (double)updateSolarCurrentReq->resumeEnergy /1000000 ;
+  backupThreshold = (double)updateSolarCurrentReq->backupThreshold /1000000 ;
+  offThreshold = (double)updateSolarCurrentReq->offThreshold /1000000 ;
+  CapacityEnergy = (double)updateSolarCurrentReq->CapacityEnergy /1000 ;
+}
+
 static void startSampling(struct StartSamplingRequestPacket *startSamplingReq) {
   samplePc = startSamplingReq->cores;
-
+  Intermittent_init();
   if(samplePc) {
     firstCore = 0;
     uint64_t c = startSamplingReq->cores;
@@ -585,6 +597,7 @@ int UsbDataReceived(USB_Status_TypeDef status, uint32_t xf, uint32_t remaining) 
         case USB_CMD_JTAG_INIT:        currentPacketSize = sizeof(struct JtagInitRequestPacket);        break;
         case USB_CMD_BREAKPOINT:       currentPacketSize = sizeof(struct BreakpointRequestPacket);      break;
         case USB_CMD_START_SAMPLING:   currentPacketSize = sizeof(struct StartSamplingRequestPacket);   break;
+        case USB_CMD_HARVESTING_CURRENT:   currentPacketSize = sizeof(struct HarvestingCurrentPacket);   break;
         case USB_CMD_GET_SAMPLE:       currentPacketSize = sizeof(struct GetSampleRequestPacket);       break;
         case USB_CMD_CAL_SET:          currentPacketSize = sizeof(struct CalSetRequestPacket);          break;
         case USB_CMD_TCK:              currentPacketSize = sizeof(struct SetTckRequestPacket);          break;
@@ -618,6 +631,7 @@ int UsbDataReceived(USB_Status_TypeDef status, uint32_t xf, uint32_t remaining) 
         case USB_CMD_JTAG_INIT:        initJtag((struct JtagInitRequestPacket *)req);               break;
         case USB_CMD_BREAKPOINT:       setBreakpoint((struct BreakpointRequestPacket *)req);        break;
         case USB_CMD_START_SAMPLING:   startSampling((struct StartSamplingRequestPacket *)req);     break;
+        case USB_CMD_HARVESTING_CURRENT:   updateSolarCurrent((struct HarvestingCurrentPacket *)req);     break;
         case USB_CMD_GET_SAMPLE:       getSample((struct GetSampleRequestPacket *)req);             break;
         case USB_CMD_CAL_SET:          calSet((struct CalSetRequestPacket *)req);                   break;
         case USB_CMD_TCK:              setTck((struct SetTckRequestPacket *)req);                   break;

@@ -29,7 +29,7 @@
 //#define PRINTBIT
 //#define DUMP_PINS
 
-static inline void jtagPinWrite(bool clk, bool tdi, bool tms) {
+inline void jtagPinWrite(bool clk, bool tdi, bool tms) {
 #ifndef __linux__
   if(tdi) GPIO_PinOutSet(TDI_PORT, TDI_BIT);
   else GPIO_PinOutClear(TDI_PORT, TDI_BIT);

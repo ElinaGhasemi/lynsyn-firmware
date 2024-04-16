@@ -60,7 +60,20 @@ void panic(const char *fmt, ...) {
   va_end(args);
   while(true);
 }
-
+//////////////////////////////////////////////////////////////////////////////
+extern void energy_spectrum(void);
+extern double harvestingCurrent;
+volatile int ADC_value;
+extern double ADC_send;
+extern double E_consuming;
+extern double E_harvesting;
+extern double Instantaneous_energy;
+extern int PES_microcontroller_state;
+extern int ble_state;
+extern double offset, gain;
+extern void Intermittent_init(void);
+extern void test_on_off();
+extern int64_t newTime;
 ///////////////////////////////////////////////////////////////////////////////
 
 int main(void) {
@@ -71,6 +84,7 @@ int main(void) {
   CMU_ClockEnable(cmuClock_HFPER, true);
   CMU_ClockEnable(cmuClock_USB, true);
   CMU_ClockEnable(cmuClock_ADC0, true);
+  CMU_ClockEnable(cmuClock_GPIO, true);
 #endif
 
   printf("Lynsyn initializing...\n");
@@ -86,10 +100,12 @@ int main(void) {
 
   printf("Hardware V%" PRIx32 ".%" PRIx32 " Firmware %s\n", (getUint32("hwver") & 0xf0) >> 4, getUint32("hwver") & 0xf, SW_VERSION_STRING);
 
-  jtagInitLowLevel();
+  //jtagInitLowLevel();
+  GPIO_PinModeSet(TDI_PORT, TDI_BIT, gpioModePushPull, 0);
+  GPIO_PinModeSet(JTAG_PORT, JTAG_TMS_BIT, gpioModePushPull, 0);
   adcInit();
   usbInit();
-
+  
   clearLed(0);
 
   printf("Ready.\n");
@@ -99,6 +115,8 @@ int main(void) {
   unsigned currentSample = 0;
 
   struct SampleReplyPacket *sampleBuf = sampleBuf1;
+
+test_on_off();
 
   // main loop
   while(true) {
@@ -117,7 +135,6 @@ int main(void) {
       bool sampleOk = true;
 
       {
-        samplePtr->time = currentTime;
         adcScan(samplePtr->channel);
         if(samplePc) {
           sampleOk = coreReadPcsrFast(samplePtr->pc, &halted);
@@ -137,18 +154,31 @@ int main(void) {
                 break;
               }
             }
+
           }
         } else {
-          for(int i = 0; i < 4; i++) {
-            samplePtr->pc[i] = 0;
-          }
+
         }
 
         if(!useStopBp) {
           halted = currentTime >= sampleStop;
         }
 
-        adcScanWait();
+	adcScanWait();
+        ADC_value = samplePtr->channel[4];
+        energy_spectrum();
+        samplePtr->channel[4] = ADC_value;
+            samplePtr->pc[0] = E_harvesting *1e12; //nj
+            samplePtr->pc[1] = E_consuming *1e12;  // nj
+            samplePtr->pc[2] = Instantaneous_energy *1e12; //nj
+            samplePtr->pc[3] = ADC_send * 1e9;
+            samplePtr->channel[4] = PES_microcontroller_state *200;
+            samplePtr->channel[2] = ble_state *200;
+            //samplePtr->pc[3] = PES_microcontroller_state;
+            //samplePtr->pc[3] = ADC_value;
+            //samplePtr->pc[2] = offset*1e6 ; 
+            //samplePtr->pc[3] = gain*1e6;
+            samplePtr->time = newTime;
       }
 
       if(halted) {
